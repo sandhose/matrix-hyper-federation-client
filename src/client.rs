@@ -401,7 +401,7 @@ pub struct AuthHeader<'a> {
     pub signature: &'a str,
 }
 
-pub fn parse_auth_header(header: &str) -> Option<AuthHeader> {
+pub fn parse_auth_header(header: &str) -> Option<AuthHeader<'_>> {
     let header = header.strip_prefix("X-Matrix ")?;
 
     let mut origin = None;

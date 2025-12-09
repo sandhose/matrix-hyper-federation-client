@@ -11,7 +11,6 @@ use std::task::{self, Poll};
 use anyhow::{format_err, Context, Error};
 use bytes::Bytes;
 use futures::FutureExt;
-use hickory_resolver::error::ResolveErrorKind;
 use http::header::{HOST, LOCATION};
 use http::{Request, Uri};
 use http_body_util::{BodyExt, Full};
@@ -51,13 +50,13 @@ pub struct Endpoint {
 /// A resolver for Matrix server names.
 #[derive(Debug, Clone)]
 pub struct MatrixResolver {
-    resolver: hickory_resolver::TokioAsyncResolver,
+    resolver: hickory_resolver::TokioResolver,
 }
 
 impl MatrixResolver {
     /// Create a new [`MatrixResolver`]
     pub fn new() -> Result<MatrixResolver, Error> {
-        let resolver = hickory_resolver::TokioAsyncResolver::tokio_from_system_conf()?;
+        let resolver = hickory_resolver::TokioResolver::builder_tokio()?.build();
 
         Ok(MatrixResolver { resolver })
     }
@@ -143,18 +142,16 @@ impl MatrixResolver {
 
         let records = match result {
             Ok(records) => records,
-            Err(err) => match err.kind() {
-                ResolveErrorKind::NoRecordsFound { .. } => {
-                    debug!("SRV returned not found, using host and port 8448");
-                    return Ok(vec![Endpoint {
-                        host: host.clone(),
-                        port: 8448,
-                        host_header: authority.to_string(),
-                        tls_name: host.clone(),
-                    }]);
-                }
-                _ => return Err(err.into()),
-            },
+            Err(err) if err.is_no_records_found() => {
+                debug!("SRV returned not found, using host and port 8448");
+                return Ok(vec![Endpoint {
+                    host: host.clone(),
+                    port: 8448,
+                    host_header: authority.to_string(),
+                    tls_name: host.clone(),
+                }]);
+            }
+            Err(err) => return Err(err.into()),
         };
 
         let mut priority_map: BTreeMap<u16, Vec<_>> = BTreeMap::new();
