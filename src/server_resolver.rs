@@ -22,7 +22,7 @@ use hyper_util::rt::TokioIo;
 use log::{debug, trace, warn};
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpStream;
-use tokio_rustls::rustls::ClientConfig;
+use tokio_rustls::rustls::{self, ClientConfig};
 use tower_service::Service;
 use url::Url;
 
@@ -309,20 +309,40 @@ pub struct MatrixConnector {
 }
 
 impl MatrixConnector {
-    /// Create new [`MatrixConnector`] with the given [`MatrixResolver`].
-    pub fn with_resolver(resolver: MatrixResolver) -> MatrixConnector {
-        let client_config = ClientConfig::builder()
-            .with_native_roots()
-            .unwrap()
-            .with_no_client_auth();
-
+    /// Create new [`MatrixConnector`] with the given [`ClientConfig`] and [`MatrixResolver`].
+    pub fn new(client_config: ClientConfig, resolver: MatrixResolver) -> MatrixConnector {
         MatrixConnector {
             resolver,
             client_config,
         }
     }
 
+    /// Create new [`MatrixConnector`] with the given [`MatrixResolver`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the system root certificates cannot be loaded
+    pub fn with_resolver(resolver: MatrixResolver) -> MatrixConnector {
+        let client_config = ClientConfig::builder()
+            .with_native_roots()
+            .unwrap()
+            .with_no_client_auth();
+
+        MatrixConnector::new(client_config, resolver)
+    }
+
+    /// Create new [`MatrixConnector`] with the given [`ClientConfig`] using the default [`MatrixResolver`].
+    pub fn with_tls_config(client_config: ClientConfig) -> Result<MatrixConnector, Error> {
+        let resolver = MatrixResolver::new()?;
+
+        Ok(MatrixConnector::new(client_config, resolver))
+    }
+
     /// Create new [`MatrixConnector`] with a default [`MatrixResolver`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the system root certificates cannot be loaded
     pub fn with_default_resolver() -> Result<MatrixConnector, Error> {
         let resolver = MatrixResolver::new()?;
 

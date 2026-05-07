@@ -36,17 +36,35 @@ pub struct FederationClient {
 }
 
 impl FederationClient {
+    /// Create a new client with the given [`Client`].
     pub fn new(client: Client<MatrixConnector, Full<Bytes>>) -> Self {
         FederationClient { client }
     }
 
-    /// Helper function to build a [`FederationClient`].
+    /// Create a new [`FederationClient`] using the given [`MatrixConnector`].
+    ///
+    /// Example with a custom TLS configuration:
+    ///
+    /// ```rust
+    /// use matrix_hyper_federation_client::{FederationClient, MatrixConnector};
+    /// use tokio_rustls::rustls::{ClientConfig, RootCertStore};
+    ///
+    /// let client_config = ClientConfig::builder()
+    ///     .with_root_certificates(RootCertStore::empty())
+    ///     .with_no_client_auth();
+    ///
+    /// let connector = MatrixConnector::with_tls_config(client_config).unwrap();
+    /// let federation_client = FederationClient::with_connector(connector);
+    /// ```
+    pub fn with_connector(connector: MatrixConnector) -> Self {
+        FederationClient::new(Client::builder(TokioExecutor::new()).build(connector))
+    }
+
+    /// Helper function to build a [`FederationClient`] with a default DNS resolver and TLS configuration.
     pub fn new_with_default_resolver() -> Result<FederationClient, Error> {
         let connector = MatrixConnector::with_default_resolver()?;
 
-        Ok(FederationClient {
-            client: Client::builder(TokioExecutor::new()).build(connector),
-        })
+        Ok(FederationClient::with_connector(connector))
     }
 
     pub async fn request(
